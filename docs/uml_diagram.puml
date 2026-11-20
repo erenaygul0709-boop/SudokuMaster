@@ -1,0 +1,191 @@
+@startuml SudokuMaster_Class_Diagram
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+
+package "com.sudokumaster.domain" {
+    enum Difficulty {
+        EASY
+        MEDIUM
+        HARD
+        - displayName : String
+        - initialClues : int
+        - pointsPerMove : int
+        + getDisplayName() : String
+        + getInitialClues() : int
+        + getPointsPerMove() : int
+    }
+
+    abstract class SudokuCell {
+        - row : int
+        - col : int
+        - solutionValue : int
+        - value : int
+        # SudokuCell(row: int, col: int, value: int, solutionValue: int)
+        # setInternalValue(newValue: int) : void
+        + getRow() : int
+        + getCol() : int
+        + getValue() : int
+        + getSolutionValue() : int
+        + isEmpty() : boolean
+        + isCorrect() : boolean
+        + {abstract} setValue(newValue: int) : void
+        + {abstract} isEditable() : boolean
+        + {abstract} getDisplayColor() : Color
+        + {abstract} getCellType() : String
+        + {abstract} copy() : SudokuCell
+    }
+
+    class FixedCell extends SudokuCell {
+        + FixedCell(row: int, col: int, clueValue: int)
+        + setValue(newValue: int) : void
+        + isEditable() : boolean
+        + getDisplayColor() : Color
+        + getCellType() : String
+        + copy() : SudokuCell
+    }
+
+    class UserCell extends SudokuCell {
+        + UserCell(row: int, col: int, initialValue: int, solutionValue: int)
+        + setValue(newValue: int) : void
+        + isEditable() : boolean
+        + getDisplayColor() : Color
+        + getCellType() : String
+        + copy() : SudokuCell
+    }
+
+    class HintCell extends SudokuCell {
+        + HintCell(row: int, col: int, solutionValue: int)
+        + setValue(newValue: int) : void
+        + isEditable() : boolean
+        + getDisplayColor() : Color
+        + getCellType() : String
+        + copy() : SudokuCell
+    }
+
+    class SudokuBoard {
+        + {static} SIZE : int = 9
+        + {static} SUBGRID_SIZE : int = 3
+        - grid : SudokuCell[9][9]
+        + SudokuBoard(initialClues: int[][], solution: int[][])
+        + SudokuBoard(cells: SudokuCell[][])
+        + getCell(row: int, col: int) : SudokuCell
+        + replaceCell(row: int, col: int, newCell: SudokuCell) : void
+        + isPlacementValidInCurrentGrid(row: int, col: int, digit: int) : boolean
+        + isSolved() : boolean
+    }
+
+    class GameState {
+        - board : SudokuBoard
+        - difficulty : Difficulty
+        - maxMistakes : int
+        - mistakes : int
+        - elapsedSeconds : int
+        - score : int
+        - hintsRemaining : int
+        - playerName : String
+        + isGameOverByMistakes() : boolean
+        + incrementMistakes() : void
+        + incrementElapsedSeconds() : void
+    }
+
+    class ScoreRecord implements Comparable {
+        + {static} BY_DIFFICULTY_AND_TIME : Comparator<ScoreRecord>
+        + {static} BY_DATE_DESCENDING : Comparator<ScoreRecord>
+        - playerName : String
+        - score : int
+        - completionSeconds : int
+        - mistakes : int
+        - difficulty : Difficulty
+        - completedAt : LocalDateTime
+        + compareTo(other: ScoreRecord) : int
+    }
+
+    SudokuBoard "1" *-- "81" SudokuCell : composition
+    GameState "1" *-- "1" SudokuBoard : composition
+    GameState "1" --> "1" Difficulty : association
+    ScoreRecord "*" --> "1" Difficulty : association
+}
+
+package "com.sudokumaster.command" {
+    interface SudokuCommand {
+        + execute() : void
+        + undo() : void
+        + getDescription() : String
+    }
+
+    class PlaceDigitCommand implements SudokuCommand {
+        - board : SudokuBoard
+        - row : int
+        - col : int
+        - newDigit : int
+        - previousValue : int
+        + execute() : void
+        + undo() : void
+    }
+
+    class EraseDigitCommand implements SudokuCommand {
+        - board : SudokuBoard
+        - row : int
+        - col : int
+        - erasedValue : int
+        + execute() : void
+        + undo() : void
+    }
+
+    class CommandHistory {
+        - historyStack : Stack<SudokuCommand>
+        + executeCommand(command: SudokuCommand) : void
+        + undoLast() : Optional<SudokuCommand>
+        + canUndo() : boolean
+    }
+
+    CommandHistory "1" o-- "*" SudokuCommand : aggregation
+    PlaceDigitCommand --> SudokuBoard : modifies
+    EraseDigitCommand --> SudokuBoard : modifies
+}
+
+package "com.sudokumaster.exception" {
+    class InvalidSudokuMoveException extends Exception {
+        - row : int
+        - col : int
+        - attemptedValue : int
+        - strikeInduced : boolean
+    }
+}
+
+package "com.sudokumaster.persistence" {
+    class GamePersistenceManager {
+        - scoresFilePath : Path
+        - saveFilePath : Path
+        + saveHighScores(scores: List<ScoreRecord>) : void
+        + loadHighScores() : ArrayList<ScoreRecord>
+        + saveGameState(state: GameState) : void
+        + loadGameState() : GameState
+    }
+}
+
+package "com.sudokumaster.service" {
+    class SudokuGenerator {
+        + generateBoard(difficulty: Difficulty) : SudokuBoard
+        + {static} createDeterministicBoard() : SudokuBoard
+    }
+
+    class SudokuGameController {
+        - generator : SudokuGenerator
+        - persistenceManager : GamePersistenceManager
+        - commandHistory : CommandHistory
+        - leaderboard : ArrayList<ScoreRecord>
+        - gameState : GameState
+        + placeDigit(row: int, col: int, digit: int) : void
+        + eraseDigit(row: int, col: int) : void
+        + undo() : Optional<SudokuCommand>
+        + useHint(row: int, col: int) : HintCell
+    }
+
+    SudokuGameController "1" *-- "1" CommandHistory
+    SudokuGameController "1" *-- "1" GameState
+    SudokuGameController "1" o-- "*" ScoreRecord
+    SudokuGameController "1" --> "1" SudokuGenerator
+    SudokuGameController "1" --> "1" GamePersistenceManager
+}
+@enduml
