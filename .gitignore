@@ -1,0 +1,26 @@
+# Compiled class files and Maven build output
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+
+# Runtime local persistence files
+data/
+
+# IDE metadata (except shared runConfigurations)
+.idea/*
+!.idea/runConfigurations/
+!.idea/runConfigurations/*.xml
+*.iws
+*.iml
+*.ipr
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS files
+.DS_Store
+Thumbs.db
